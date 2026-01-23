@@ -1,4 +1,8 @@
+// ce fichier gère la page des événements, affichant les membres et permettant la déconnexion
+
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import Navbar from "../components/Navbar";
 import "./styles/EventsPage.scss";
 
 interface User {
@@ -10,10 +14,12 @@ interface User {
 export default function EventsPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showCreateEvent, setShowCreateEvent] = useState(false);
   const currentUser = localStorage.getItem("username") || "Utilisateur";
+  const navigate = useNavigate();
 
   useEffect(() => {
-    fetch("http://localhost:5000/api/users")
+    fetch("http://localhost:5000/api/users") //
       .then((res) => res.json())
       .then((data) => {
         setUsers(data.users || []);
@@ -25,28 +31,20 @@ export default function EventsPage() {
       });
   }, []);
 
-  const Logout = () => { // Déconnexion de l'utilisateur
+  const Logout = () => { 
     localStorage.removeItem("token");
     localStorage.removeItem("username");
+    localStorage.removeItem("userId");
     window.location.reload();
   };
 
-  return ( // 
+  const handleMemberClick = (userId: string) => {
+    navigate(`/profile/${userId}`);
+  };
+
+  return ( 
     <div className="events-page">
-      <header className="navbar">
-        <div className="navbar-content">
-          <div className="navbar-left">
-            <h1 className="site-title">Le bazar de Tommy</h1>
-            <nav className="nav-links">
-              <a href="#" className="nav-link active">MEMBRES</a>
-              <a href="#" className="nav-link">ACTIVITE</a>
-            </nav>
-          </div>
-          <button className="btn-logout" onClick={Logout}>
-            DÉCONNEXION
-          </button>
-        </div>
-      </header>
+      <Navbar active="members" onLogout={Logout} currentUserId={localStorage.getItem("userId")} />
 
       <div className="page-content">
         <div className="welcome-section">
@@ -54,10 +52,7 @@ export default function EventsPage() {
         </div>
 
         <div className="members-section">
-          <div className="section-header">
-            <h3>NOUVEAUX MEMBRES</h3>
-            <a href="#" className="view-all">TOUS LES MEMBRES</a>
-          </div>
+          <h3>Membres inscrits</h3>
 
           {loading ? (
             <p className="loading">Chargement...</p>
@@ -66,7 +61,11 @@ export default function EventsPage() {
           ) : (
             <div className="members-grid">
               {users.map((user) => (
-                <div key={user.id} className="member-card">
+                <div 
+                  key={user.id} 
+                  className="member-card"
+                  onClick={() => handleMemberClick(user.id)}
+                >
                   <div className="member-avatar">
                     <span>{user.username.charAt(0).toUpperCase()}</span>
                   </div>

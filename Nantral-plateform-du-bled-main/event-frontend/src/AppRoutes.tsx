@@ -6,6 +6,9 @@ import type {User} from "./utils/types"
 import LoginPage from "./Page/LoginPage.tsx";
 import SignupPage from "./Page/SignupPage.tsx";
 import EventsPage from "./Page/EventsPage.tsx";
+import UserProfilePage from "./Page/UserProfilePage.tsx";
+import CalendarPage from "./Page/CalendarPage.tsx";
+import FilmsPage from "./Page/FilmsPage.tsx";
 
 type AppRoutesProgs={
     user:User |null;
@@ -53,6 +56,36 @@ export default function AppRoutes({ user }: AppRoutesProgs){
                 element={
                     isAuthenticated ?(
                         <EventsPage/>
+                    ): (
+                        <Navigate to="/login" replace/>
+                    )
+                }
+            />
+            <Route 
+                path="/profile/:userId"
+                element={
+                    isAuthenticated ?(
+                        <UserProfilePage/>
+                    ): (
+                        <Navigate to="/login" replace/>
+                    )
+                }
+            />
+            <Route 
+                path="/calendar"
+                element={
+                    isAuthenticated ?(
+                        <CalendarPage/>
+                    ): (
+                        <Navigate to="/login" replace/>
+                    )
+                }
+            />
+            <Route 
+                path="/films"
+                element={
+                    isAuthenticated ?(
+                        <FilmsPage/>
                     ): (
                         <Navigate to="/login" replace/>
                     )

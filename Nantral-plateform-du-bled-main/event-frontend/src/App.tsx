@@ -1,4 +1,4 @@
-// Quand on ouvre localhost:5173 Ce fichier sert a la racine de l'application React et gère l'authentification de l'utilisateur
+// Quand on ouvre localhost:5173 Ce fichier gère l'authentification de l'utilisateur
 
 import { useEffect, useState } from 'react';
 import { BrowserRouter } from 'react-router-dom';
@@ -19,7 +19,7 @@ export default function App() {
       return;   
     }
     
-    valiateToken() // Vérifie la validité du token stocké
+    valiateToken() 
       .then((user) => {
         setUser(user);
       })
@@ -29,7 +29,7 @@ export default function App() {
       });
   }, []);
 
-  return (// Passe l'utilisateur authentifié a AppRoutes
+  return (
     <BrowserRouter>
       <AppRoutes  user={user}/> 
     </BrowserRouter>

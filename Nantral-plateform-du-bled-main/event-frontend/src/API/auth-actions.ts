@@ -11,7 +11,7 @@ export async function apiSignup(username: string, email: string, password: strin
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data?.error || "Signup failed");
-  return data; // {id, username, email}
+  return data; 
 }
 
 // Fonction connexion 
@@ -26,19 +26,26 @@ export async function apiLogin(username: string, password: string) {
   return data; // {token}
 }
 
-// Valide token JWT dans localStorage
+
 export async function apiValidate(token: string) {
   const res = await fetch(`${API_BASE_URL}/api/validate`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data?.error || "Validate failed");
-  return data; // {user:{id, username}}
+  return data; 
 }
 
 export async function login(username: string, password: string) {
   const data = await apiLogin(username, password);
   localStorage.setItem("token", data.token);
+  
+
+  const userData = await apiValidate(data.token);
+  if (userData.user?.id) {
+    localStorage.setItem("userId", userData.user.id.toString());
+  }
+  
   return data;
 }
 
@@ -46,6 +53,7 @@ export async function signup(username: string, email: string, password: string) 
   const data = await apiSignup(username, email, password);
   return data;
 }
+
 
 export async function valiateToken() {
   const token = localStorage.getItem("token");

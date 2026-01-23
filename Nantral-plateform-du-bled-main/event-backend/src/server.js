@@ -54,7 +54,7 @@ app.post("/api/login", async (req, res) => {
   try {
     const { username, password } = req.body;
 
-    const result = await pool.query(
+    const result = await pool.query( // Récupère l'utilisateur par nom d'utilisateur
       "SELECT id, username, password_hash FROM public.users WHERE username = $1",
       [username]
     );
@@ -63,20 +63,20 @@ app.post("/api/login", async (req, res) => {
       return res.status(401).json({ error: "Invalid credentials" });
     }
 
-    const user = result.rows[0];
-    const isMatch = await bcrypt.compare(password, user.password_hash);
+    const user = result.rows[0]; // Récupère l'utilisateur
+    const isMatch = await bcrypt.compare(password, user.password_hash); // Vérifie le mot de passe
 
     if (!isMatch) {
       return res.status(401).json({ error: "Invalid credentials" });
     }
 
-    const token = jwt.sign(
+    const token = jwt.sign( // Génère un token JWT
       { id: user.id, username: user.username },
       JWT_SECRET,
       { expiresIn: "1h" }
     );
 
-    res.json({ token });
+    res.json({ token }); // Renvoie le token au client
   } catch (err) {
     console.error("Login error:", err);
     res.status(500).json({ error: "Server error during login" });
@@ -84,7 +84,7 @@ app.post("/api/login", async (req, res) => {
 });
 
 app.get("/api/validate", async (req, res) => {
-  const authHeader = req.headers.authorization;
+  const authHeader = req.headers.authorization; // LE HEADER SERT A TRANSMETTRE LE TOKEN
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
     return res.status(401).json({ error: "No token provided" });
   }
@@ -107,6 +107,209 @@ app.get("/api/users", async (req, res) => {
   } catch (err) {
     console.error("Get users error:", err);
     res.status(500).json({ error: "Server error fetching users" });
+  }
+});
+
+// Récupérer les films d'un utilisateur 
+app.get("/api/users/:userId/movies", async (req, res) => {
+  try {
+    const { userId } = req.params;
+    
+    const result = await pool.query(
+      "SELECT id, title, movie_type, added_at FROM user_movies WHERE user_id = $1 ORDER BY added_at DESC",
+      [userId]
+    );
+
+    const favorites = result.rows.filter(m => m.movie_type === 'favorite');
+    const toWatch = result.rows.filter(m => m.movie_type === 'to_watch');
+
+    res.json({ 
+      favorites,
+      toWatch,
+      count: result.rows.length 
+    });
+  } catch (err) {
+    console.error("Get user movies error:", err);
+    res.status(500).json({ error: "Server error fetching movies" });
+  }
+});
+
+// Ajouter un film pour un utilisateur
+app.post("/api/users/:userId/movies", async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { title, movieType } = req.body;
+
+    if (!title || !movieType) {
+      return res.status(400).json({ error: "Missing title or movieType" });
+    }
+
+    if (!['favorite', 'to_watch'].includes(movieType)) {
+      return res.status(400).json({ error: "Invalid movieType. Must be 'favorite' or 'to_watch'" });
+    }
+
+    const result = await pool.query(
+      "INSERT INTO user_movies (user_id, title, movie_type) VALUES ($1, $2, $3) RETURNING id, title, movie_type, added_at",
+      [userId, title, movieType]
+    );
+
+    res.status(201).json(result.rows[0]);
+  } catch (err) {
+    if (err.code === '23505') {
+      return res.status(409).json({ error: "Movie already exists in this list" });
+    }
+    console.error("Add movie error:", err);
+    res.status(500).json({ error: "Server error adding movie" });
+  }
+});
+
+// Supprimer un film
+app.delete("/api/users/:userId/movies/:movieId", async (req, res) => {
+  try {
+    const { userId, movieId } = req.params;
+    
+    await pool.query(
+      "DELETE FROM user_movies WHERE id = $1 AND user_id = $2",
+      [movieId, userId]
+    );
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error("Delete movie error:", err);
+    res.status(500).json({ error: "Server error deleting movie" });
+  }
+});
+
+// Récupérer tous les événements
+app.get("/api/events", async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT e.*, u.username as creator_name,
+       (SELECT COUNT(*) FROM event_participants WHERE event_id = e.id) as participant_count
+       FROM events e
+       JOIN users u ON e.created_by = u.id
+       ORDER BY e.event_date ASC`
+    );
+
+    res.json({ events: result.rows });
+  } catch (err) {
+    console.error("Get events error:", err);
+    res.status(500).json({ error: "Server error fetching events" });
+  }
+});
+
+// Créer un nouvel événement
+app.post("/api/events", async (req, res) => {
+  try {
+    const { createdBy, movieTitle, location, eventDate, description } = req.body;
+
+    if (!createdBy || !movieTitle || !location || !eventDate) {
+      return res.status(400).json({ error: "Missing required fields" });
+    }
+
+    const result = await pool.query(
+      `INSERT INTO events (created_by, movie_title, location, event_date, description) 
+       VALUES ($1, $2, $3, $4, $5) 
+       RETURNING id, created_by, movie_title, location, event_date, description, created_at`,
+      [createdBy, movieTitle, location, eventDate, description || null]
+    );
+
+    // Ajouter automatiquement le créateur comme participant
+    await pool.query(
+      "INSERT INTO event_participants (event_id, user_id) VALUES ($1, $2)",
+      [result.rows[0].id, createdBy]
+    );
+
+    res.status(201).json(result.rows[0]);
+  } catch (err) {
+    console.error("Create event error:", err);
+    res.status(500).json({ error: "Server error creating event" });
+  }
+});
+
+// Rejoindre un événement
+app.post("/api/events/:eventId/join", async (req, res) => {
+  try {
+    const { eventId } = req.params;
+    const { userId } = req.body;
+
+    if (!userId) {
+      return res.status(400).json({ error: "Missing userId" });
+    }
+
+    await pool.query(
+      "INSERT INTO event_participants (event_id, user_id) VALUES ($1, $2)",
+      [eventId, userId]
+    );
+
+    res.status(201).json({ success: true });
+  } catch (err) {
+    if (err.code === '23505') {
+      return res.status(409).json({ error: "Already joined this event" });
+    }
+    console.error("Join event error:", err);
+    res.status(500).json({ error: "Server error joining event" });
+  }
+});
+
+// Quitter un événement
+app.delete("/api/events/:eventId/leave", async (req, res) => {
+  try {
+    const { eventId } = req.params;
+    const { userId } = req.body;
+
+    await pool.query(
+      "DELETE FROM event_participants WHERE event_id = $1 AND user_id = $2",
+      [eventId, userId]
+    );
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error("Leave event error:", err);
+    res.status(500).json({ error: "Server error leaving event" });
+  }
+});
+
+// Récupérer les participants d'un événement
+app.get("/api/events/:eventId/participants", async (req, res) => {
+  try {
+    const { eventId } = req.params;
+    
+    const result = await pool.query(
+      `SELECT u.id, u.username, u.email, ep.joined_at
+       FROM event_participants ep
+       JOIN users u ON ep.user_id = u.id
+       WHERE ep.event_id = $1
+       ORDER BY ep.joined_at ASC`,
+      [eventId]
+    );
+
+    res.json({ participants: result.rows });
+  } catch (err) {
+    console.error("Get participants error:", err);
+    res.status(500).json({ error: "Server error fetching participants" });
+  }
+});
+
+// Récupérer les événements organisés par un utilisateur
+app.get("/api/users/:userId/events", async (req, res) => {
+  try {
+    const { userId } = req.params;
+    
+    const result = await pool.query(
+      `SELECT e.*, u.username as creator_name,
+       (SELECT COUNT(*) FROM event_participants WHERE event_id = e.id) as participant_count
+       FROM events e
+       JOIN users u ON e.created_by = u.id
+       WHERE e.created_by = $1
+       ORDER BY e.event_date ASC`,
+      [userId]
+    );
+
+    res.json({ events: result.rows });
+  } catch (err) {
+    console.error("Get user events error:", err);
+    res.status(500).json({ error: "Server error fetching user events" });
   }
 });
 
