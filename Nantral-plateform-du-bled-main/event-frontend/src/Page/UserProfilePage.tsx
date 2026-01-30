@@ -28,6 +28,15 @@ interface UserData {
   email: string;
 }
 
+interface Review {
+  id: number;
+  movie_title: string;
+  rating: number;
+  comment: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 const UserProfilePage = () => {
   const { userId } = useParams<{ userId: string }>();
   const navigate = useNavigate();
@@ -35,6 +44,8 @@ const UserProfilePage = () => {
   const [favorites, setFavorites] = useState<Movie[]>([]);
   const [toWatch, setToWatch] = useState<Movie[]>([]);
   const [organizedEvents, setOrganizedEvents] = useState<Event[]>([]);
+  const [joinedEvents, setJoinedEvents] = useState<Event[]>([]);
+  const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddMovie, setShowAddMovie] = useState(false);
   const [newMovieTitle, setNewMovieTitle] = useState("");
@@ -45,6 +56,8 @@ const UserProfilePage = () => {
     fetchUserData();
     fetchMovies();
     fetchOrganizedEvents();
+    fetchJoinedEvents();
+    fetchUserReviews();
   }, [userId]);
 
   const fetchUserData = async () => {
@@ -83,6 +96,26 @@ const UserProfilePage = () => {
     }
   };
 
+  const fetchJoinedEvents = async () => {
+    try {
+      const response = await fetch(`http://localhost:5000/api/users/${userId}/joined-events`);
+      const data = await response.json();
+      setJoinedEvents(data.events || []);
+    } catch (error) {
+      console.error("Error fetching joined events:", error);
+    }
+  };
+
+  const fetchUserReviews = async () => {
+    try {
+      const response = await fetch(`http://localhost:5000/api/users/${userId}/reviews`);
+      const data = await response.json();
+      setReviews(data.reviews || []);
+    } catch (error) {
+      console.error("Error fetching reviews:", error);
+    }
+  };
+
   const handleAddMovie = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newMovieTitle.trim()) return;
@@ -108,15 +141,34 @@ const UserProfilePage = () => {
   };
 
   const handleDeleteMovie = async (movieId: number) => {
-    if (!confirm("Supprimer ce film ?")) return;
+    // if (!confirm("Supprimer ce film ?")) return;
 
-    try {
+    try { //http://localhost:5173
       await fetch(`http://localhost:5000/api/users/${userId}/movies/${movieId}`, {
         method: "DELETE",
       });
       fetchMovies();
     } catch (error) {
       console.error("Error deleting movie:", error);
+    }
+  };
+
+  const handleDeleteEvent = async (eventId: number) => {
+    if (!isOwnProfile) return;
+    try {
+      const response = await fetch(`http://localhost:5000/api/events/${eventId}`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+      });
+
+      if (response.ok) {
+        setOrganizedEvents(organizedEvents.filter(e => e.id !== eventId));
+      } else {
+        alert("Erreur lors de la suppression");
+      }
+    } catch (error) {
+      console.error("Error deleting event:", error);
+      alert("Erreur lors de la suppression");
     }
   };
 
@@ -138,9 +190,6 @@ const UserProfilePage = () => {
   return (
     <div className="user-profile-page">
       <Navbar active="profile" onLogout={() => { localStorage.removeItem("token"); localStorage.removeItem("username"); localStorage.removeItem("userId"); window.location.reload(); }} currentUserId={localStorage.getItem("userId")} />
-      <button className="back-button" onClick={() => navigate("/events")}> 
-        Retour
-      </button>
 
       <div className="profile-header">
         <div className="avatar">{user?.username.charAt(0).toUpperCase()}</div>
@@ -201,6 +250,9 @@ const UserProfilePage = () => {
             </button>
           )}
         </div>
+
+
+
         <div className="movies-grid">
           {toWatch.length === 0 ? (
             <p className="empty"></p>
@@ -221,6 +273,20 @@ const UserProfilePage = () => {
           )}
         </div>
       </div>
+    
+    
+
+      <div className="movies-grid">
+        <div className="section-header">
+          <h2>Films Notés et Critiqués</h2>
+        </div>
+        <div className="movies-grid">
+         
+          <p className="empty"></p>
+        </div>
+      </div>
+
+
 
       <div className="events-section">
         <div className="section-header">
@@ -235,16 +301,62 @@ const UserProfilePage = () => {
                 <div className="event-info">
                   <h3>{event.movie_title}</h3>
                   <div className="detail-row">
-                    <span className="icon">📍</span>
+                    <span className="icon"></span>
                     <span>{event.location}</span>
                   </div>
                   <div className="detail-row">
-                    <span className="icon">📅</span>
+                    <span className="icon"></span>
                     <span>{formatDate(event.event_date)}</span>
                   </div>
                   <div className="detail-row">
-                    <span className="icon">👥</span>
+                    <span className="icon"></span>
                     <span>{event.participant_count} participant{event.participant_count > 1 ? "s" : ""}</span>
+                  </div>
+                  {isOwnProfile && (
+                    <button
+                      className="delete-btn"
+                      onClick={() => handleDeleteEvent(event.id)}
+                    >
+                      ×
+                    </button>
+                  )}
+                  {event.description && (
+                    <p className="event-description">{event.description}</p>
+                  )}
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+
+      <div className="events-section">
+        <div className="section-header">
+          <h2>Séances Rejointes</h2>
+        </div>
+        <div className="events-list">
+          {joinedEvents.length === 0 ? (
+            <p className="empty">Aucune séance rejointe</p>
+          ) : (
+            joinedEvents.map((event) => (
+              <div key={event.id} className="event-item">
+                <div className="event-info">
+                  <h3>{event.movie_title}</h3>
+                  <div className="detail-row">
+                    <span className="label">Lieu:</span>
+                    <span>{event.location}</span>
+                  </div>
+                  <div className="detail-row">
+                    <span className="label">Date:</span>
+                    <span>{formatDate(event.event_date)}</span>
+                  </div>
+                  <div className="detail-row">
+                    <span className="label">Organisateur:</span>
+                    <span>{event.creator_name}</span>
+                  </div>
+                  <div className="detail-row">
+                    <span className="label">Participants:</span>
+                    <span>{event.participant_count}</span>
                   </div>
                   {event.description && (
                     <p className="event-description">{event.description}</p>

@@ -180,18 +180,84 @@ app.delete("/api/users/:userId/movies/:movieId", async (req, res) => {
   }
 });
 
+// Récupérer les critiques d'un utilisateur
+app.get("/api/users/:userId/reviews", async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const result = await pool.query(
+      `SELECT id, movie_title, rating, comment, created_at, updated_at
+       FROM user_movie_reviews
+       WHERE user_id = $1
+       ORDER BY updated_at DESC, created_at DESC`,
+      [userId]
+    );
+
+    res.json({ reviews: result.rows, count: result.rows.length });
+  } catch (err) {
+    console.error("Get user reviews error:", err);
+    res.status(500).json({ error: "Server error fetching reviews" });
+  }
+});
+
+// Ajouter ou mettre à jour une critique
+app.post("/api/users/:userId/reviews", async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { movieTitle, rating, comment } = req.body;
+
+    if (!movieTitle || !rating) {
+      return res.status(400).json({ error: "Missing movieTitle or rating" });
+    }
+
+    const ratingValue = Number(rating);
+    if (!Number.isInteger(ratingValue) || ratingValue < 1 || ratingValue > 5) {
+      return res.status(400).json({ error: "Rating must be an integer between 1 and 5" });
+    }
+
+    const result = await pool.query(
+      `INSERT INTO user_movie_reviews (user_id, movie_title, rating, comment)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (user_id, movie_title)
+       DO UPDATE SET rating = EXCLUDED.rating, comment = EXCLUDED.comment, updated_at = CURRENT_TIMESTAMP
+       RETURNING id, movie_title, rating, comment, created_at, updated_at`,
+      [userId, movieTitle, ratingValue, comment || null]
+    );
+
+    res.status(201).json(result.rows[0]);
+  } catch (err) {
+    console.error("Add review error:", err);
+    res.status(500).json({ error: "Server error adding review" });
+  }
+});
+
 // Récupérer tous les événements
 app.get("/api/events", async (req, res) => {
   try {
-    const result = await pool.query(
-      `SELECT e.*, u.username as creator_name,
-       (SELECT COUNT(*) FROM event_participants WHERE event_id = e.id) as participant_count
-       FROM events e
-       JOIN users u ON e.created_by = u.id
-       ORDER BY e.event_date ASC`
-    );
-
-    res.json({ events: result.rows });
+    const { userId } = req.query;
+    
+    if (userId) {
+      const result = await pool.query(
+        `SELECT e.*, u.username as creator_name,
+         CAST((SELECT COUNT(*) FROM event_participants WHERE event_id = e.id) AS INTEGER) as participant_count,
+         CASE WHEN ep.user_id IS NOT NULL THEN true ELSE false END as is_participant
+         FROM events e
+         JOIN users u ON e.created_by = u.id
+         LEFT JOIN event_participants ep ON e.id = ep.event_id AND ep.user_id = $1
+         ORDER BY e.event_date ASC`,
+        [parseInt(userId)]
+      );
+      res.json({ events: result.rows });
+    } else {
+      const result = await pool.query(
+        `SELECT e.*, u.username as creator_name,
+         CAST((SELECT COUNT(*) FROM event_participants WHERE event_id = e.id) AS INTEGER) as participant_count,
+         false as is_participant
+         FROM events e
+         JOIN users u ON e.created_by = u.id
+         ORDER BY e.event_date ASC`
+      );
+      res.json({ events: result.rows });
+    }
   } catch (err) {
     console.error("Get events error:", err);
     res.status(500).json({ error: "Server error fetching events" });
@@ -201,17 +267,17 @@ app.get("/api/events", async (req, res) => {
 // Créer un nouvel événement
 app.post("/api/events", async (req, res) => {
   try {
-    const { createdBy, movieTitle, location, eventDate, description } = req.body;
+    const { createdBy, movieTitle, location, eventDate, description, maxParticipants } = req.body;
 
     if (!createdBy || !movieTitle || !location || !eventDate) {
       return res.status(400).json({ error: "Missing required fields" });
     }
 
     const result = await pool.query(
-      `INSERT INTO events (created_by, movie_title, location, event_date, description) 
-       VALUES ($1, $2, $3, $4, $5) 
-       RETURNING id, created_by, movie_title, location, event_date, description, created_at`,
-      [createdBy, movieTitle, location, eventDate, description || null]
+      `INSERT INTO events (created_by, movie_title, location, event_date, description, max_participants) 
+       VALUES ($1, $2, $3, $4, $5, $6) 
+       RETURNING id, created_by, movie_title, location, event_date, description, max_participants, created_at`,
+      [createdBy, movieTitle, location, eventDate, description || null, maxParticipants || null]
     );
 
     // Ajouter automatiquement le créateur comme participant
@@ -237,12 +303,39 @@ app.post("/api/events/:eventId/join", async (req, res) => {
       return res.status(400).json({ error: "Missing userId" });
     }
 
-    await pool.query(
-      "INSERT INTO event_participants (event_id, user_id) VALUES ($1, $2)",
-      [eventId, userId]
-    );
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
 
-    res.status(201).json({ success: true });
+      const capacityResult = await client.query(
+        `SELECT max_participants,
+         (SELECT COUNT(*) FROM event_participants WHERE event_id = $1) AS participant_count
+         FROM events WHERE id = $1
+         FOR UPDATE`,
+        [eventId]
+      );
+
+      if (capacityResult.rows.length === 0) {
+        await client.query("ROLLBACK");
+        return res.status(404).json({ error: "Event not found" });
+      }
+
+      const { max_participants, participant_count } = capacityResult.rows[0];
+      if (max_participants !== null && Number(participant_count) >= Number(max_participants)) {
+        await client.query("ROLLBACK");
+        return res.status(409).json({ error: "Event is full" });
+      }
+
+      await client.query(
+        "INSERT INTO event_participants (event_id, user_id) VALUES ($1, $2)",
+        [eventId, userId]
+      );
+
+      await client.query("COMMIT");
+      res.status(201).json({ success: true });
+    } finally {
+      client.release();
+    }
   } catch (err) {
     if (err.code === '23505') {
       return res.status(409).json({ error: "Already joined this event" });
@@ -310,6 +403,52 @@ app.get("/api/users/:userId/events", async (req, res) => {
   } catch (err) {
     console.error("Get user events error:", err);
     res.status(500).json({ error: "Server error fetching user events" });
+  }
+});
+
+// Récupérer les événements auxquels l'utilisateur a rejoint
+app.get("/api/users/:userId/joined-events", async (req, res) => {
+  try {
+    const { userId } = req.params;
+    
+    const result = await pool.query(
+      `SELECT e.*, u.username as creator_name,
+       (SELECT COUNT(*) FROM event_participants WHERE event_id = e.id) as participant_count
+       FROM events e
+       JOIN users u ON e.created_by = u.id
+       JOIN event_participants ep ON e.id = ep.event_id
+       WHERE ep.user_id = $1 AND e.created_by != $1
+       ORDER BY e.event_date ASC`,
+      [userId]
+    );
+
+    res.json({ events: result.rows });
+  } catch (err) {
+    console.error("Get joined events error:", err);
+    res.status(500).json({ error: "Server error fetching joined events" });
+  }
+});
+
+app.delete("/api/events/:eventId", async (req, res) => {
+  try {
+    const { eventId } = req.params;
+
+    // Supprimer d'abord les participants
+    await pool.query(
+      "DELETE FROM event_participants WHERE event_id = $1",
+      [eventId]
+    );
+
+    // Puis supprimer l'événement
+    await pool.query(
+      "DELETE FROM events WHERE id = $1",
+      [eventId]
+    );
+
+    res.json({ success: true, message: "Event deleted successfully" });
+  } catch (err) {
+    console.error("Delete event error:", err);
+    res.status(500).json({ error: "Server error deleting event" });
   }
 });
 

@@ -363,6 +363,16 @@
       }
 
       form {
+        label {
+          display: block;
+          margin: 0 0 0.5rem 0;
+          color: #9ab;
+          font-size: 0.9rem;
+          font-weight: 600;
+          text-transform: uppercase;
+          letter-spacing: 1px;
+        }
+
         input {
           width: 100%;
           padding: 0.75rem;
@@ -372,6 +382,23 @@
           border-radius: 4px;
           font-size: 1rem;
           margin-bottom: 1.5rem;
+
+          &:focus {
+            outline: none;
+            border-color: #00c030;
+          }
+        }
+
+        textarea {
+          width: 100%;
+          padding: 0.75rem;
+          border: 1px solid #456;
+          background: #14181c;
+          color: #fff;
+          border-radius: 4px;
+          font-size: 1rem;
+          margin-bottom: 1.5rem;
+          resize: vertical;
 
           &:focus {
             outline: none;
@@ -415,3 +442,365 @@
     }
   }
 }
+
+// Tabs
+.tabs {
+  display: flex;
+  gap: 1rem;
+  margin: 1.5rem 0;
+  border-bottom: 2px solid #2c3440;
+
+  .tab {
+    padding: 0.75rem 1.5rem;
+    background: transparent;
+    border: none;
+    color: #9ab;
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -2px;
+
+    &.active {
+      color: #00c030;
+      border-bottom-color: #00c030;
+    }
+
+    &:hover {
+      color: #fff;
+    }
+  }
+}
+
+// Section recherche
+.search-section {
+  margin: 2rem 0;
+
+  .search-bar {
+    display: flex;
+    gap: 0.5rem;
+    max-width: 600px;
+
+    input {
+      flex: 1;
+      padding: 0.75rem 1rem;
+      background: #2c3440;
+      border: 1px solid #456;
+      border-radius: 4px;
+      color: #fff;
+      font-size: 0.95rem;
+
+      &:focus {
+        outline: none;
+        border-color: #00c030;
+      }
+
+      &::placeholder {
+        color: #789;
+      }
+    }
+
+    button {
+      padding: 0.75rem 1.5rem;
+      background: #00c030;
+      border: none;
+      border-radius: 4px;
+      color: #fff;
+      font-size: 1.2rem;
+      cursor: pointer;
+      transition: all 0.2s;
+
+      &:hover:not(:disabled) {
+        background: #00d435;
+      }
+
+      &:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+      }
+    }
+  }
+
+  .api-warning {
+    margin-top: 1rem;
+    padding: 0.75rem 1rem;
+    background: rgba(255, 152, 0, 0.1);
+    border-left: 3px solid #ff9800;
+    color: #ff9800;
+    font-size: 0.9rem;
+  }
+}
+
+// Grille films TMDB
+.tmdb-movies-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 1.5rem;
+  padding: 1rem 0;
+
+  .tmdb-movie-card {
+    background: #2c3440;
+    border-radius: 8px;
+    overflow: hidden;
+    transition: transform 0.2s;
+    cursor: pointer;
+
+
+    &:hover {
+      transform: translateY(-5px);
+
+      .movie-overlay {
+        background: rgba(0, 0, 0, 0.9);
+      }
+    }
+
+    .movie-poster {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 2/3;
+      overflow: hidden;
+
+      img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block;
+      }
+
+      .movie-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.3);
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        align-items: center;
+        padding: 1rem;
+        opacity: 1;
+        visibility: visible;
+        pointer-events: auto;
+        transition: background 0.3s ease;
+        z-index: 20;
+
+        &.visible {
+          opacity: 1;
+          visibility: visible;
+          pointer-events: auto;
+        }
+
+        .movie-rating {
+          align-self: flex-end;
+          font-size: 1rem;
+          color: #ffd700;
+          font-weight: bold;
+          z-index: 21;
+        }
+
+        .movie-actions {
+          display: flex;
+          gap: 1rem;
+          justify-content: center;
+          width: 100%;
+          z-index: 21;
+
+          button {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 4px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            flex: 1;
+            max-width: 120px;
+          }
+
+          .btn-add-favorite {
+            background: #ff4444;
+            color: #fff;
+
+            &:hover {
+              background: #ff6666;
+              transform: scale(1.05);
+            }
+          }
+
+          .btn-add-watchlist {
+            background: #00c030;
+            color: #fff;
+
+            &:hover {
+              background: #00d435;
+              transform: scale(1.05);
+            }
+          }
+          
+          .btn-critique {
+            background: #4514cd;
+            color: #fff;
+
+            &:hover {
+          
+            .btn-add-review {
+              background: #456;
+              color: #fff;
+
+              &:hover {
+                background: #567;
+                transform: scale(1.05);
+              }
+            }
+              background: #5a3edc;
+              transform: scale(1.05);
+            }
+          }
+
+
+
+        }
+      }
+    }
+
+    .movie-info {
+      padding: 0.75rem;
+
+      h4 {
+        margin: 0 0 0.25rem 0;
+        font-size: 0.9rem;
+        color: #fff;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .release-date {
+        margin: 0;
+        font-size: 0.8rem;
+        color: #789;
+      }
+    }
+  }
+}
+
+
+.my-list-section {
+  .list-category {
+    margin: 2rem 0;
+
+    h3 {
+      color: #fff;
+      margin-bottom: 1rem;
+      font-size: 1.2rem;
+    }
+
+    .movies-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+
+      .empty-message {
+        padding: 2rem;
+        text-align: center;
+        color: #789;
+        background: #2c3440;
+        border-radius: 8px;
+      }
+
+      .my-movie-card {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 1rem 1.5rem;
+        background: #2c3440;
+        border-radius: 8px;
+        transition: all 0.2s;
+
+        &:hover {
+          background: #3d4a5c;
+        }
+
+        .movie-details {
+          h4 {
+            margin: 0 0 0.25rem 0;
+            color: #fff;
+            font-size: 1rem;
+          }
+
+          .added-date {
+            margin: 0;
+            font-size: 0.85rem;
+            color: #789;
+          }
+        }
+
+        .delete-btn {
+          background: transparent;
+          border: none;
+          color: #ff4444;
+          font-size: 1.5rem;
+          cursor: pointer;
+          padding: 0.25rem 0.5rem;
+          transition: all 0.2s;
+
+          &:hover {
+            color: #fff;
+            background: #ff4444;
+            border-radius: 4px;
+          }
+        }
+      }
+    }
+  }
+}
+
+.empty-state {
+  padding: 3rem;
+  text-align: center;
+  color: #789;
+}
+
+
+.pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 2rem;
+  margin: 3rem 0;
+
+  .btn-pagination {
+    padding: 0.75rem 1.5rem;
+    background: #00c030;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 0.95rem;
+    transition: all 0.2s;
+
+    &:hover:not(:disabled) {
+      background: #00d435;
+      transform: scale(1.05);
+    }
+
+    &:disabled {
+      background: #456;
+      color: #789;
+      cursor: not-allowed;
+      opacity: 0.5;
+    }
+  }
+
+  .page-info {
+    color: #9ab;
+    font-weight: 600;
+    font-size: 0.95rem;
+    min-width: 150px;
+    text-align: center;
+  }
+}
+

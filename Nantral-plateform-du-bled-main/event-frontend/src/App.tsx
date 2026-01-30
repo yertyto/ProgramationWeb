@@ -6,6 +6,7 @@ import './App.css'
 import type {User} from "./utils/types";
 import { valiateToken } from './API/auth-actions';
 import AppRoutes from './AppRoutes';
+import { ThemeProvider } from './context/ThemeContext';
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
@@ -30,9 +31,11 @@ export default function App() {
   }, []);
 
   return (
-    <BrowserRouter>
-      <AppRoutes  user={user}/> 
-    </BrowserRouter>
+    <ThemeProvider>
+      <BrowserRouter>
+        <AppRoutes  user={user}/> 
+      </BrowserRouter>
+    </ThemeProvider>
   );
   
 }

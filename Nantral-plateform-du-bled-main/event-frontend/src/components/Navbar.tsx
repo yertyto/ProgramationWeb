@@ -1,4 +1,5 @@
 import { useNavigate } from "react-router-dom";
+import "./Navbar.css";
 
 export type NavSection = "members" | "sessions" | "films" | "profile";
 
@@ -52,6 +53,7 @@ const Navbar = ({ active, onLogout, currentUserId }: NavbarProps) => {
             >
               Profil
             </a>
+            <span> </span>
           </nav>
         </div>
         <div className="navbar-right">

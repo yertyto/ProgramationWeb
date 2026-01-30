@@ -150,6 +150,76 @@
     }
   }
 
+  .reviews-section {
+    margin-bottom: 3rem;
+
+    .section-header {
+      margin-bottom: 1.5rem;
+
+      h2 {
+        margin: 0;
+        font-size: 1.5rem;
+        text-transform: uppercase;
+        letter-spacing: 2px;
+        color: #fff;
+      }
+    }
+
+    .reviews-list {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+
+      .empty {
+        color: #9ab;
+        font-style: italic;
+      }
+
+      .review-item {
+        background: #2c3440;
+        padding: 1.5rem;
+        border-radius: 8px;
+        transition: transform 0.2s;
+
+        &:hover {
+          transform: translateX(4px);
+          background: #456;
+        }
+
+        .review-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 0.75rem;
+
+          h3 {
+            margin: 0;
+            font-size: 1.1rem;
+            color: #fff;
+          }
+
+          .review-rating {
+            color: #ffd700;
+            font-weight: 600;
+            font-size: 0.95rem;
+          }
+        }
+
+        .review-comment {
+          margin: 0 0 0.75rem 0;
+          color: #d4d4d4;
+          line-height: 1.5;
+        }
+
+        .review-date {
+          margin: 0;
+          font-size: 0.85rem;
+          color: #789;
+        }
+      }
+    }
+  }
+
   .events-section {
     margin-bottom: 3rem;
 
@@ -180,6 +250,7 @@
         padding: 1.5rem;
         border-radius: 8px;
         transition: transform 0.2s;
+        position: relative;
 
         &:hover {
           transform: translateX(4px);
@@ -202,6 +273,35 @@
 
             .icon {
               font-size: 1rem;
+            }
+
+            .label {
+              font-weight: 600;
+              color: #fff;
+            }
+          }
+
+          .delete-btn {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            background: rgba(255, 255, 255, 0.1);
+            border: none;
+            color: #fff;
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 1.5rem;
+            line-height: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+
+            &:hover {
+              background: #e74c3c;
+              transform: scale(1.1);
             }
           }
 
@@ -286,6 +386,84 @@
               &:hover {
                 background: #00d435;
               }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+// Mode clair
+[data-theme="light"] {
+  .user-profile-page {
+    background: #f5f5f5;
+    color: #213547;
+
+    .back-button {
+      background: #e0e0e0;
+      color: #213547;
+
+      &:hover {
+        background: #ccc;
+      }
+    }
+
+    .profile-header {
+      background: #ffffff;
+      border: 1px solid #ddd;
+
+      .profile-avatar {
+        background: #0066cc;
+      }
+
+      .profile-info {
+        h1 {
+          color: #213547;
+        }
+
+        p {
+          color: #666;
+        }
+      }
+    }
+
+    .profile-sections {
+      .section-title {
+        color: #213547;
+      }
+
+      .empty-message {
+        background: #ffffff;
+        border: 1px solid #ddd;
+        color: #666;
+      }
+
+      .events-grid,
+      .movies-list {
+        .event-card,
+        .movie-card {
+          background: #ffffff;
+          border: 1px solid #ddd;
+
+          h3 {
+            color: #213547;
+          }
+
+          .event-meta,
+          p {
+            color: #666;
+          }
+
+          .participant-badge {
+            background: #e3f2fd;
+            color: #0066cc;
+          }
+
+          .btn-primary,
+          .btn-danger {
+            &:hover {
+              opacity: 0.9;
             }
           }
         }

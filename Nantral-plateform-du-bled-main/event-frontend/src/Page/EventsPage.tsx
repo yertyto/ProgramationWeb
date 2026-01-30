@@ -48,6 +48,7 @@ export default function EventsPage() {
 
       <div className="page-content">
         <div className="welcome-section">
+          {/* Dire bonjour au nom de l'utilisateur connecté */}
           <h2>Bienvenue, {currentUser}.</h2>
         </div>
 

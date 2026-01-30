@@ -1,0 +1,3 @@
+
+ALTER TABLE public.events
+ADD COLUMN IF NOT EXISTS max_participants INTEGER DEFAULT 10;

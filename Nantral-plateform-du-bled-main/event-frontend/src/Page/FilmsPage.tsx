@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import Navbar from "../components/Navbar";
+import { searchMovies, getPopularMovies, getImageUrl, isApiKeyConfigured } from "../API/tmdb";
+import type { TMDBMovie } from "../API/tmdb";
 import "./styles/FilmsPage.scss";
 
 interface Movie {
@@ -10,35 +11,162 @@ interface Movie {
   added_at: string;
 }
 
-interface PopularMovie {
-  id: number;
-  title: string;
-  image: string;
-}
+// Mapping de mots-clés vers des films spécifiques
+const KEYWORD_TO_MOVIE: Record<string, string> = {
+  "meilleur film monde": "Dancer in the Dark",
+  "omar montino": "italien pour debutants",
+  "bastien felix": "forrest gump",
+  "christine yejin": "Chine",
+  "amaury" : "Un ptit truc en plus",
+  "hugo delaruelle" : "riche",
+  "chloe moalic" : "belle de jour",
+  "milo soulard" : "le gout du riz",
+  "nicolas" : "slut",
+  "liam" : "corée du nord, un plan",
+  "moalic" : "j'aurais pu etre une",
+  "eloi" : "Napoleon en australie",
+  "rayan" : "kaguya-sama : love is war",
+  "zakaria" : "fumer fait tousser",
+  "guillaume" : "Si tu tends l'oreille",
+  "julien" : "big mamma",
+  "bastien lavaux" : "lol",
+  "fatoumata" : "Un senegalais en Normandie",
+  "lucas" : "baywatch",
+  "richard" : "l'etrange histoire de benjamin button",
+
+};  
 
 const FilmsPage = () => {
-  const navigate = useNavigate();
   const [favorites, setFavorites] = useState<Movie[]>([]);
   const [toWatch, setToWatch] = useState<Movie[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showAddMovie, setShowAddMovie] = useState(false);
   const [movieType, setMovieType] = useState<"favorite" | "to_watch">("favorite");
-  const [newMovieTitle, setNewMovieTitle] = useState("");
   const currentUserId = localStorage.getItem("userId");
-
-  // Films populaires cette semaine
-  const popularMovies: PopularMovie[] = [
-    { id: 1, title: "Les parapluies de Cherbourg", image: "/Images_films/Parapluies.webp" },
-    { id: 2, title: "Dancer in the Dark", image: "/Images_films/Dancer.webp" },
-    { id: 3, title: "Twin peaks : Fire walk with me", image: "/Images_films/Twin.webp" },
-    { id: 4, title: "Linda Linda Linda", image: "/Images_films/Linda.webp" },
-    { id: 5, title: "Fire of Love", image: "/Images_films/fire.webp" },
-    { id: 6, title: "L'evangile selon Saint Matthieu", image: "/Images_films/Evangile.webp" },
-  ];
+  
+  // TMDB
+  const [searchQuery, setSearchQuery] = useState("");
+  const [tmdbMovies, setTmdbMovies] = useState<TMDBMovie[]>([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState<"discover" | "my-list">("discover");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [showReviewModal, setShowReviewModal] = useState(false);
+  const [reviewMovieTitle, setReviewMovieTitle] = useState("");
+  const [reviewRating, setReviewRating] = useState("5");
+  const [reviewComment, setReviewComment] = useState("");
 
   useEffect(() => {
     fetchMovies();
+    loadPopularMovies();
   }, []);
+
+  const loadPopularMovies = async (page: number = 1) => {
+    if (!isApiKeyConfigured()) {
+      console.warn("TMDB API key not configured");
+      return;
+    }
+    try {
+      const data = await getPopularMovies(page);
+      setTmdbMovies(data.results);
+      setTotalPages(data.total_pages);
+      setCurrentPage(page);
+    } catch (error) {
+      console.error("Error loading popular movies:", error);
+    }
+  };
+
+  const handleSearch = async (e: React.FormEvent, page: number = 1) => {
+    e.preventDefault();
+    if (!searchQuery.trim() || !isApiKeyConfigured()) return;
+    
+    setSearchLoading(true);
+    try {
+      // Vérifier si la recherche correspond à un mot-clé défini
+      const normalizedQuery = searchQuery.toLowerCase().trim();
+      const queryToUse = KEYWORD_TO_MOVIE[normalizedQuery] || searchQuery;
+      
+      const data = await searchMovies(queryToUse, page);
+      setTmdbMovies(data.results);
+      setTotalPages(data.total_pages);
+      setCurrentPage(page);
+    } catch (error) {
+      console.error("Error searching movies:", error);
+    } finally {
+      setSearchLoading(false);
+    }
+  };
+
+  const handleNextPage = () => {
+    if (currentPage < totalPages) {
+      const nextPage = currentPage + 1;
+      if (searchQuery.trim()) {
+        handleSearch(new Event('submit') as any, nextPage);
+      } else {
+        loadPopularMovies(nextPage);
+      }
+    }
+  };
+
+  const handlePreviousPage = () => {
+    if (currentPage > 1) {
+      const prevPage = currentPage - 1;
+      if (searchQuery.trim()) {
+        handleSearch(new Event('submit') as any, prevPage);
+      } else {
+        loadPopularMovies(prevPage);
+      }
+    }
+  };
+
+  const handleOpenReview = (movieTitle: string) => {
+    if (!currentUserId) {
+      alert("Vous devez être connecté");
+      return;
+    }
+    setReviewMovieTitle(movieTitle);
+    setReviewRating("5");
+    setReviewComment("");
+    setShowReviewModal(true);
+  };
+
+  const handleSubmitReview = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!currentUserId) {
+      alert("Vous devez être connecté");
+      return;
+    }
+
+    if (!reviewMovieTitle.trim() || !reviewRating) {
+      alert("Veuillez remplir la note");
+      return;
+    }
+
+    try {
+      const response = await fetch(`http://localhost:5000/api/users/${currentUserId}/reviews`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          movieTitle: reviewMovieTitle,
+          rating: Number(reviewRating),
+          comment: reviewComment,
+        }),
+      });
+
+      if (response.ok) {
+        setShowReviewModal(false);
+        setReviewMovieTitle("");
+        setReviewRating("5");
+        setReviewComment("");
+        alert("Critique enregistrée");
+      } else {
+        const error = await response.json();
+        alert(error.error || "Erreur lors de la création de la critique");
+      }
+    } catch (error) {
+      console.error("Error adding review:", error);
+      alert("Erreur lors de la création de la critique");
+    }
+  };
 
   const fetchMovies = async () => {
     try {
@@ -53,21 +181,19 @@ const FilmsPage = () => {
     }
   };
 
-  const handleAddMovie = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newMovieTitle.trim()) return;
+  const handleAddMovie = async (movieTitle: string, type: "favorite" | "to_watch") => {
+    if (!movieTitle.trim()) return;
 
     try {
       const response = await fetch(`http://localhost:5000/api/users/${currentUserId}/movies`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title: newMovieTitle, movieType }),
+        body: JSON.stringify({ title: movieTitle, movieType: type }),
       });
 
       if (response.ok) {
-        setNewMovieTitle("");
-        setShowAddMovie(false);
         fetchMovies();
+       
       } else {
         const error = await response.json();
         alert(error.error);
@@ -77,8 +203,10 @@ const FilmsPage = () => {
     }
   };
 
+ 
+
   const handleDeleteMovie = async (movieId: number) => {
-    if (!confirm("Supprimer ce film ?")) return;
+    //if (!confirm("Supprimer ce film ?")) return;
 
     try {
       await fetch(`http://localhost:5000/api/users/${currentUserId}/movies/${movieId}`, {
@@ -105,114 +233,222 @@ const FilmsPage = () => {
 
       <div className="page-content">
         <div className="header-section">
-          <h2>Mes Films</h2>
-          <p>Gérez vos films favoris et vos envies cinéma</p>
+          <h2>Films</h2>
+          
+          {/* Tabs */}
+          <div className="tabs">
+            <button 
+              className={`tab ${activeTab === 'discover' ? 'active' : ''}`}
+              onClick={() => setActiveTab('discover')}
+            >
+              Découvrir
+            </button>
+            <button 
+              className={`tab ${activeTab === 'my-list' ? 'active' : ''}`}
+              onClick={() => setActiveTab('my-list')}
+            >
+              Ma liste
+            </button>
+          </div>
         </div>
 
-        <div className="films-container">
-          <div className="films-section popular-section">
-            <div className="section-header">
-              <h3> Films populaires cette semaine</h3>
+        {activeTab === 'discover' ? (
+          <>
+            {}
+            <div className="search-section">
+              <form onSubmit={handleSearch} className="search-bar">
+                <input
+                  type="text"
+                  placeholder="Rechercher un film..."
+                  value={searchQuery} 
+
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+                <button type="submit" disabled={searchLoading}>
+                  {searchLoading ? "..." : "Rechercher"}
+
+                </button>
+              </form>
+              {!isApiKeyConfigured() && (
+                <p className="api-warning"> Configurez votre clé API TMDB dans src/API/tmdb.ts</p>
+              )}
             </div>
-            <div className="popular-movies-grid">
-              {popularMovies.map((movie) => (
-                <div key={movie.id} className="popular-movie-card">
-                  <div className="movie-image">
-                    <img src={movie.image} alt={movie.title} />
+
+            {}
+            <div className="tmdb-movies-grid">
+              {tmdbMovies.map((movie) => (
+                <div key={movie.id} className="tmdb-movie-card">
+                  <div className="movie-poster">
+                    <img 
+                      src={getImageUrl(movie.poster_path)} 
+                      alt={movie.title}
+                      onError={(e) => {
+                        e.currentTarget.src = '/placeholder-movie.png';
+                      }}
+                    />
                     <div className="movie-overlay">
-                      <button 
-                        className="add-to-favorites"
-                        onClick={() => {
-                          setNewMovieTitle(movie.title);
-                          setMovieType("favorite");
-                          setShowAddMovie(true);
-                        }}
-                      >
-                        ♥ Favoris
-                      </button>
-                      <button 
-                        className="add-to-watchlist"
-                        onClick={() => {
-                          setNewMovieTitle(movie.title);
-                          setMovieType("to_watch");
-                          setShowAddMovie(true);
-                        }}
-                      >
-                         À voir
-                      </button>
+                      <div className="movie-rating">🌟 {movie.vote_average.toFixed(1)}</div>
+                      <div className="movie-actions">
+                        <button 
+                          className="btn-add-favorite"
+                          onClick={() => handleAddMovie(movie.title, "favorite")}
+                          title="Ajouter aux favoris"
+                        >
+                          ♥
+                        </button>
+                        <button 
+                          className="btn-add-watchlist"
+                          onClick={() => handleAddMovie(movie.title, "to_watch")}
+                          title="Ajouter à ma liste"
+                        >
+                          +
+                        </button>
+                      
+                        <button
+                          className="btn-add-review"
+                          title="Ajouter une critique"
+                          onClick={() => handleOpenReview(movie.title)}
+                          type="button"
+                        >
+                          🖋
+                        </button>
+
+                      </div>
                     </div>
+     
                   </div>
                   <div className="movie-info">
                     <h4>{movie.title}</h4>
-
+                    <p className="release-date">{movie.release_date ? new Date(movie.release_date).getFullYear() : 'N/A'}</p>
                   </div>
                 </div>
               ))}
             </div>
-          </div>
 
-          <div className="films-section">
-            <div className="section-header">
-              <h3> Ma Watchlist</h3>
+          
+            <div className="pagination">
               <button 
-                className="btn-add" 
-                onClick={() => {
-                  setMovieType("to_watch");
-                  setNewMovieTitle("");
-                  setShowAddMovie(true);
-                }}
+                onClick={handlePreviousPage}
+                disabled={currentPage === 1 || searchLoading}
+                className="btn-pagination"
               >
-                + Ajouter
+                ← Précédente
+              </button>
+              <span className="page-info">Page {currentPage} sur {totalPages}</span>
+              <button 
+                onClick={handleNextPage}
+                disabled={currentPage >= totalPages || searchLoading}
+                className="btn-pagination"
+              >
+                Suivante →
               </button>
             </div>
-            <div className="movies-grid">
-              {toWatch.length === 0 ? (
-                <p className="empty-message">Aucun film dans votre watchlist</p>
-              ) : (
-                toWatch.map((movie) => (
-                  <div key={movie.id} className="movie-card">
-                    <div className="movie-content">
-                      <h4>{movie.title}</h4>
-                    </div>
-                    <button
-                      className="delete-btn"
-                      onClick={() => handleDeleteMovie(movie.id)}
-                      title="Supprimer"
-                    >
-                      ×
-                    </button>
-                  </div>
-                ))
-              )}
+
+            {tmdbMovies.length === 0 && !searchLoading && (
+              <div className="empty-state">
+                <p>Aucun film trouvé.</p>
+              </div>
+            )}
+          </>
+        ) : (
+          <>
+            {/* Ma liste */}
+            <div className="my-list-section">
+              <div className="list-category">
+                <h3> Favoris</h3>
+                <div className="movies-list">
+                  {favorites.length === 0 ? (
+                    <p className="empty-message">Aucun film favori</p>
+                  ) : (
+                    favorites.map((movie) => (
+                      <div key={movie.id} className="my-movie-card">
+                        <div className="movie-details">
+                          <h4>{movie.title}</h4>
+                          <p className="added-date">
+                            Ajouté le {new Date(movie.added_at).toLocaleDateString('fr-FR')}
+                          </p>
+                        </div>
+                        <button
+                          className="delete-btn"
+                          onClick={() => handleDeleteMovie(movie.id)}
+                          title="Supprimer"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+
+              <div className="list-category">
+                <h3> À regarder</h3>
+                <div className="movies-list">
+                  {toWatch.length === 0 ? (
+                    <p className="empty-message">Aucun film dans votre watchlist</p>
+                  ) : (
+                    toWatch.map((movie) => (
+                      <div key={movie.id} className="my-movie-card">
+                        <div className="movie-details">
+                          <h4>{movie.title}</h4>
+                          <p className="added-date">
+                            Ajouté le {new Date(movie.added_at).toLocaleDateString('fr-FR')}
+                          </p>
+                        </div>
+                        <button
+                          className="delete-btn"
+                          onClick={() => handleDeleteMovie(movie.id)}
+                          title="Supprimer"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+          </>
+        )}
+
+        {showReviewModal && (
+          <div className="modal-overlay" onClick={() => setShowReviewModal(false)}>
+            <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+              <h2>Ajouter une critique</h2>
+              <form onSubmit={handleSubmitReview}>
+                <input
+                  type="text"
+                  value={reviewMovieTitle}
+                  readOnly
+                />
+                <label>Note (1-5)</label>
+                <input
+                  type="number"
+                  min="1"
+                  max="5"
+                  value={reviewRating}
+                  onChange={(e) => setReviewRating(e.target.value)}
+                  required
+                />
+                <textarea
+                  placeholder="Votre commentaire..."
+                  value={reviewComment}
+                  onChange={(e) => setReviewComment(e.target.value)}
+                  rows={4}
+                />
+                <div className="modal-buttons">
+                  <button type="button" onClick={() => setShowReviewModal(false)}>
+                    Annuler
+                  </button>
+                  <button type="submit">
+                    Enregistrer
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
-        </div>
+        )}
       </div>
-
-      {showAddMovie && (
-        <div className="modal-overlay" onClick={() => setShowAddMovie(false)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <h2>
-              Ajouter un film {movieType === "favorite" ? "favori" : "à regarder"}
-            </h2>
-            <form onSubmit={handleAddMovie}>
-              <input
-                type="text"
-                placeholder="Titre du film"
-                value={newMovieTitle}
-                onChange={(e) => setNewMovieTitle(e.target.value)}
-                autoFocus
-              />
-              <div className="modal-buttons">
-                <button type="button" onClick={() => setShowAddMovie(false)}>
-                  Annuler
-                </button>
-                <button type="submit">Ajouter</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

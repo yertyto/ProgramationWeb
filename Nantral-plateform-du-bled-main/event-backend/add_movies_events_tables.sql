@@ -16,7 +16,8 @@ CREATE TABLE IF NOT EXISTS events (
     location VARCHAR(255) NOT NULL,
     event_date TIMESTAMP NOT NULL,
     description TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    max_participants INTEGER DEFAULT 10
 );
 
 CREATE TABLE IF NOT EXISTS event_participants (
@@ -32,3 +33,4 @@ CREATE INDEX IF NOT EXISTS idx_events_created_by ON events(created_by);
 CREATE INDEX IF NOT EXISTS idx_events_date ON events(event_date);
 CREATE INDEX IF NOT EXISTS idx_event_participants_event_id ON event_participants(event_id);
 CREATE INDEX IF NOT EXISTS idx_event_participants_user_id ON event_participants(user_id);
+
