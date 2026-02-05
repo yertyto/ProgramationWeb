@@ -25,6 +25,8 @@ const CalendarPage = () => {
   const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingEventId, setEditingEventId] = useState<number | null>(null);
   const [formData, setFormData] = useState({
     movieTitle: "",
     location: "",
@@ -72,6 +74,101 @@ const CalendarPage = () => {
       console.error("Error fetching events:", error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const resetForm = () => {
+    setFormData({
+      movieTitle: "",
+      location: "",
+      eventDate: "",
+      eventTime: "",
+      description: "",
+      maxParticipants: "70",
+    });
+  };
+
+  const handleCloseEditModal = () => {
+    setShowEditModal(false);
+    setEditingEventId(null);
+    resetForm();
+  };
+
+  const handleEditClick = (event: Event) => {
+    const dateTimeStr = event.event_date.replace('Z', ''); 
+    const [dateStr, timeStr] = dateTimeStr.split('T');
+    const timeOnly = timeStr ? timeStr.substring(0, 5) : "00:00"; 
+    
+    setFormData({
+      movieTitle: event.movie_title,
+      location: event.location,
+      eventDate: dateStr,
+      eventTime: timeOnly,
+      description: event.description || "",
+      maxParticipants: String(event.max_participants || 100),
+    });
+    setEditingEventId(event.id);
+    setShowEditModal(true);
+  };
+
+  const handleUpdateEvent = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!currentUserId || !editingEventId) {
+      alert("Erreur de configuration");
+      return;
+    }
+
+    if (!formData.movieTitle || !formData.location || !formData.eventDate || !formData.eventTime) {
+      alert("Veuillez remplir tous les champs requis");
+      return;
+    }
+
+    const dateTime = `${formData.eventDate}T${formData.eventTime}:00`;
+
+    console.log("Sending update:", {
+      userId: Number(currentUserId),
+      movieTitle: formData.movieTitle,
+      location: formData.location,
+      eventDate: dateTime,
+      description: formData.description,
+      maxParticipants: Number(formData.maxParticipants),
+    });
+
+    try {
+      const response = await fetch(`http://localhost:5000/api/events/${editingEventId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: Number(currentUserId),
+          movieTitle: formData.movieTitle,
+          location: formData.location,
+          eventDate: dateTime,
+          description: formData.description,
+          maxParticipants: Number(formData.maxParticipants),
+        }),
+      });
+
+      console.log("Response status:", response.status, "OK:", response.ok);
+
+      if (response.ok) {
+        handleCloseEditModal();
+        fetchEvents();
+      } else {
+        const errorText = await response.text();
+        console.error("Server error response:", errorText);
+        let errorMsg = "Erreur lors de la modification";
+        try {
+          const error = JSON.parse(errorText);
+          errorMsg = error.error || error.details || errorMsg;
+        } catch (e) {
+          errorMsg = errorText || errorMsg;
+        }
+        alert(errorMsg);
+      }
+    } catch (error) {
+      console.error("Error updating event:", error);
+      alert("Erreur lors de la modification de l'événement: " + (error instanceof Error ? error.message : String(error)));
     }
   };
 
@@ -255,19 +352,33 @@ const CalendarPage = () => {
               return (
                 <div key={event.id} className="event-card">
                   {showDeleteBtn && (
-                    <button
-                      className="delete-btn"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        console.log("BUTTON CLICKED!");
-                        handleDeleteEvent(event.id);
-                      }}
-                      title="Supprimer cette séance"
-                      type="button"
-                    >
-                      ×
-                    </button>
+                    <div className="creator-actions">
+                      <button
+                        className="edit-btn"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          handleEditClick(event);
+                        }}
+                        title="Modifier cette séance"
+                        type="button"
+                      >
+                        ✎
+                      </button>
+                      <button
+                        className="delete-btn"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                  
+                          handleDeleteEvent(event.id);
+                        }}
+                        title="Supprimer cette séance"
+                        type="button"
+                      >
+                        ×
+                      </button>
+                    </div>
                   )}
                   <div className="event-header">
                     <h3>{event.movie_title}</h3>
@@ -334,6 +445,133 @@ const CalendarPage = () => {
           </div>
         )}
       </div>
+
+      {showEditModal && (
+        <div className="modal-overlay" onClick={handleCloseEditModal}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <h2>Modifier la Séance</h2>
+            <form onSubmit={handleUpdateEvent}>
+              <div className="form-group">
+                <label>Film</label>
+                <input
+                  type="text"
+                  placeholder="Titre du film"
+                  value={formData.movieTitle}
+                  onChange={(e) =>
+                    setFormData({ ...formData, movieTitle: e.target.value })
+                  }
+                  required
+                />
+              </div>
+
+              <div className="form-group">
+                <label>Lieu</label>
+                <input
+                  type="text"
+                  placeholder="Lieu de la séance"
+                  value={formData.location}
+                  onChange={(e) =>
+                    setFormData({ ...formData, location: e.target.value })
+                  }
+                  required
+                />
+              </div>
+
+              <div className="form-row">
+                <div className="form-group">
+                  <label>Date</label>
+                  <input
+                    type="date"
+                    value={formData.eventDate}
+                    onChange={(e) =>
+                      setFormData({ ...formData, eventDate: e.target.value })
+                    }
+                    required
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label>Heure </label>
+                  <div className="time-input-group">
+                    <select
+                      value={formData.eventTime.split(":")[0] || ""}
+                      onChange={(e) => {
+                        const hours = e.target.value;
+                        const minutes = formData.eventTime.split(":")[1] || "00";
+                        setFormData({ ...formData, eventTime: `${hours}:${minutes}` });
+                      }}
+                      required
+                    >
+                      <option value="" disabled>
+                        HH
+                      </option>
+                      {hoursOptions.map((hour) => (
+                        <option key={hour} value={hour}>
+                          {hour}
+                        </option>
+                      ))}
+                    </select>
+                    <span className="time-separator">:</span>
+                    <select
+                      value={formData.eventTime.split(":")[1] || ""}
+                      onChange={(e) => {
+                        const hours = formData.eventTime.split(":")[0] || "00";
+                        const minutes = e.target.value;
+                        setFormData({ ...formData, eventTime: `${hours}:${minutes}` });
+                      }}
+                      required
+                    >
+                      <option value="" disabled>
+                        MM
+                      </option>
+                      {minutesOptions.map((minute) => (
+                        <option key={minute} value={minute}>
+                          {minute}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label>Nombre de participants max</label>
+                <input
+                  type="number"
+                  min="1"
+                  max="100"
+                  value={formData.maxParticipants}
+                  onChange={(e) =>
+                    setFormData({ ...formData, maxParticipants: e.target.value })
+                  }
+                  required
+                />
+              </div>
+
+              <div className="form-group">
+                <label>Description (optionnel)</label>
+                <textarea
+                  placeholder="Informations supplémentaires..."
+                  value={formData.description}
+                  onChange={(e) =>
+                    setFormData({ ...formData, description: e.target.value })
+                  }
+                  rows={3}
+                />
+              </div>
+
+              <div className="modal-buttons">
+                <button type="button" onClick={handleCloseEditModal}>
+                  Annuler
+                </button>
+                <button type="submit">
+                  Enregistrer les modifications
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {showCreateModal && (
         <div className="modal-overlay" onClick={() => setShowCreateModal(false)}>

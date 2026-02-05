@@ -183,7 +183,8 @@ const FilmsPage = () => {
 
   const handleAddMovie = async (movieTitle: string, type: "favorite" | "to_watch") => {
     if (!movieTitle.trim()) return;
-
+   
+    alert(`"${movieTitle}" a été ajouté à votre liste ${type === "favorite" ? "des favoris" : "à regarder"}.`);
     try {
       const response = await fetch(`http://localhost:5000/api/users/${currentUserId}/movies`, {
         method: "POST",

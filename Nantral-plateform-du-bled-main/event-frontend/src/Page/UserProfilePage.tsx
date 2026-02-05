@@ -276,16 +276,7 @@ const UserProfilePage = () => {
     
     
 
-      <div className="movies-grid">
-        <div className="section-header">
-          <h2>Films Notés et Critiqués</h2>
-        </div>
-        <div className="movies-grid">
-         
-          <p className="empty"></p>
-        </div>
-      </div>
-
+      
 
 
       <div className="events-section">

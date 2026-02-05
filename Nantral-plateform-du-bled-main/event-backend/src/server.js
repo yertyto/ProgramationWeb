@@ -293,6 +293,95 @@ app.post("/api/events", async (req, res) => {
   }
 });
 
+// Modifier un événement existant
+app.put("/api/events/:eventId", async (req, res) => {
+  try {
+    const { eventId } = req.params;
+    const { userId, movieTitle, location, eventDate, description, maxParticipants } = req.body;
+
+    console.log("PUT /api/events/:eventId - Request received:");
+    console.log("  eventId:", eventId);
+    console.log("  userId:", userId);
+    console.log("  Body:", req.body);
+
+    if (!userId) {
+      console.log("  Error: Missing userId");
+      return res.status(400).json({ error: "Missing userId" });
+    }
+
+    // Vérifier que l'utilisateur est bien le créateur de l'événement
+    const eventCheck = await pool.query(
+      "SELECT created_by FROM events WHERE id = $1",
+      [eventId]
+    );
+
+    console.log("  Event check result:", eventCheck.rows);
+
+    if (eventCheck.rows.length === 0) {
+      console.log("  Error: Event not found");
+      return res.status(404).json({ error: "Event not found" });
+    }
+
+    console.log("  Created by:", eventCheck.rows[0].created_by, "vs userId:", Number(userId));
+    
+    if (eventCheck.rows[0].created_by !== Number(userId)) {
+      console.log("  Error: User is not the creator");
+      return res.status(403).json({ error: "Only the creator can modify this event" });
+    }
+
+    // Construire la requête de mise à jour dynamiquement
+    const updates = [];
+    const values = [];
+    let paramCount = 1;
+
+    if (movieTitle !== undefined) {
+      updates.push(`movie_title = $${paramCount}`);
+      values.push(movieTitle);
+      paramCount++;
+    }
+    if (location !== undefined) {
+      updates.push(`location = $${paramCount}`);
+      values.push(location);
+      paramCount++;
+    }
+    if (eventDate !== undefined) {
+      updates.push(`event_date = $${paramCount}`);
+      values.push(eventDate);
+      paramCount++;
+    }
+    if (description !== undefined) {
+      updates.push(`description = $${paramCount}`);
+      values.push(description);
+      paramCount++;
+    }
+    if (maxParticipants !== undefined) {
+      updates.push(`max_participants = $${paramCount}`);
+      values.push(maxParticipants);
+      paramCount++;
+    }
+
+    if (updates.length === 0) {
+      console.log("  Error: No fields to update");
+      return res.status(400).json({ error: "No fields to update" });
+    }
+
+    values.push(eventId);
+    const query = `UPDATE events SET ${updates.join(", ")} WHERE id = $${paramCount} RETURNING id, created_by, movie_title, location, event_date, description, max_participants, created_at`;
+
+    console.log("  Query:", query);
+    console.log("  Values:", values);
+
+    const result = await pool.query(query, values);
+
+    console.log("  Update successful:", result.rows[0]);
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error("Update event error:", err);
+    console.error("Error details:", err.message, err.stack);
+    res.status(500).json({ error: "Server error updating event", details: err.message });
+  }
+});
+
 // Rejoindre un événement
 app.post("/api/events/:eventId/join", async (req, res) => {
   try {
