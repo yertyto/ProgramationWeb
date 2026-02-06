@@ -1,5 +1,10 @@
 import { useEffect, useState } from "react";
 import Navbar from "../components/Navbar";
+import ReviewModal from "../components/ReviewModal";
+import TmdbMovieGrid from "../components/TmdbMovieGrid";
+import MyMovieList from "../components/MyMovieList";
+import ToastContainer from "../components/ToastContainer";
+import { useToast } from "../hooks/useToast";
 import { searchMovies, getPopularMovies, getImageUrl, isApiKeyConfigured } from "../API/tmdb";
 import type { TMDBMovie } from "../API/tmdb";
 import "./styles/FilmsPage.scss";
@@ -17,26 +22,26 @@ const KEYWORD_TO_MOVIE: Record<string, string> = {
   "omar montino": "italien pour debutants",
   "bastien felix": "forrest gump",
   "christine yejin": "Chine",
-  "amaury" : "Un ptit truc en plus",
-  "hugo delaruelle" : "riche",
-  "chloe moalic" : "belle de jour",
-  "milo soulard" : "le gout du riz",
-  "nicolas" : "slut",
-  "liam" : "corée du nord, un plan",
-  "moalic" : "j'aurais pu etre une",
-  "eloi" : "Napoleon en australie",
-  "rayan" : "kaguya-sama : love is war",
-  "zakaria" : "fumer fait tousser",
-  "guillaume" : "Si tu tends l'oreille",
-  "julien" : "big mamma",
-  "bastien lavaux" : "lol",
-  "fatoumata" : "Un senegalais en Normandie",
-  "lucas" : "baywatch",
-  "richard" : "l'etrange histoire de benjamin button",
-
-};  
+  "amaury": "Un ptit truc en plus",
+  "hugo delaruelle": "riche",
+  "chloe moalic": "belle de jour",
+  "milo soulard": "le gout du riz",
+  "nicolas": "slut",
+  "liam": "corée du nord, un plan",
+  "moalic": "j'aurais pu etre une",
+  "eloi": "Napoleon en australie",
+  "rayan": "kaguya-sama : love is war",
+  "zakaria": "fumer fait tousser",
+  "guillaume": "Si tu tends l'oreille",
+  "julien": "big mamma",
+  "bastien lavaux": "lol",
+  "fatoumata": "Un senegalais en Normandie",
+  "lucas": "baywatch",
+  "richard": "l'etrange histoire de benjamin button",
+};
 
 const FilmsPage = () => {
+  const { toasts, removeToast, success, error } = useToast();
   const [favorites, setFavorites] = useState<Movie[]>([]);
   const [toWatch, setToWatch] = useState<Movie[]>([]);
   const [loading, setLoading] = useState(true);
@@ -78,13 +83,11 @@ const FilmsPage = () => {
   const handleSearch = async (e: React.FormEvent, page: number = 1) => {
     e.preventDefault();
     if (!searchQuery.trim() || !isApiKeyConfigured()) return;
-    
+
     setSearchLoading(true);
     try {
-      // Vérifier si la recherche correspond à un mot-clé défini
       const normalizedQuery = searchQuery.toLowerCase().trim();
       const queryToUse = KEYWORD_TO_MOVIE[normalizedQuery] || searchQuery;
-      
       const data = await searchMovies(queryToUse, page);
       setTmdbMovies(data.results);
       setTotalPages(data.total_pages);
@@ -100,7 +103,7 @@ const FilmsPage = () => {
     if (currentPage < totalPages) {
       const nextPage = currentPage + 1;
       if (searchQuery.trim()) {
-        handleSearch(new Event('submit') as any, nextPage);
+        handleSearch(new Event("submit") as any, nextPage);
       } else {
         loadPopularMovies(nextPage);
       }
@@ -111,7 +114,7 @@ const FilmsPage = () => {
     if (currentPage > 1) {
       const prevPage = currentPage - 1;
       if (searchQuery.trim()) {
-        handleSearch(new Event('submit') as any, prevPage);
+        handleSearch(new Event("submit") as any, prevPage);
       } else {
         loadPopularMovies(prevPage);
       }
@@ -136,11 +139,6 @@ const FilmsPage = () => {
       return;
     }
 
-    if (!reviewMovieTitle.trim() || !reviewRating) {
-      alert("Veuillez remplir la note");
-      return;
-    }
-
     try {
       const response = await fetch(`http://localhost:5000/api/users/${currentUserId}/reviews`, {
         method: "POST",
@@ -157,14 +155,13 @@ const FilmsPage = () => {
         setReviewMovieTitle("");
         setReviewRating("5");
         setReviewComment("");
-        alert("Critique enregistrée");
+        success("Critique enregistrée ✓");
       } else {
-        const error = await response.json();
-        alert(error.error || "Erreur lors de la création de la critique");
+        const errResponse = await response.json();
+        error(errResponse.error || "Erreur lors de la création de la critique");
       }
-    } catch (error) {
-      console.error("Error adding review:", error);
-      alert("Erreur lors de la création de la critique");
+    } catch (err) {
+      error("Erreur lors de la création de la critique");
     }
   };
 
@@ -183,8 +180,7 @@ const FilmsPage = () => {
 
   const handleAddMovie = async (movieTitle: string, type: "favorite" | "to_watch") => {
     if (!movieTitle.trim()) return;
-   
-    alert(`"${movieTitle}" a été ajouté à votre liste ${type === "favorite" ? "des favoris" : "à regarder"}.`);
+
     try {
       const response = await fetch(`http://localhost:5000/api/users/${currentUserId}/movies`, {
         method: "POST",
@@ -193,14 +189,16 @@ const FilmsPage = () => {
       });
 
       if (response.ok) {
+        const message = `"${movieTitle}" ajouté aux ${type === "favorite" ? "favoris" : "à regarder"}`;
+        success(message);
         fetchMovies();
-       
       } else {
-        const error = await response.json();
-        alert(error.error);
+        const errResponse = await response.json();
+        error(errResponse.error || "Erreur lors de l'ajout du film");
       }
-    } catch (error) {
-      console.error("Error adding movie:", error);
+    } catch (err) {
+      console.error("Error adding movie:", err);
+      error("Erreur lors de l'ajout du film");
     }
   };
 
@@ -226,230 +224,83 @@ const FilmsPage = () => {
     window.location.reload();
   };
 
-  if (loading) return <div className="loading">Chargement...</div>;
-
-  return (
+return (
     <div className="films-page">
-      <Navbar active="films" onLogout={Logout} currentUserId={localStorage.getItem("userId")} />
+      <Navbar active="films" onLogout={Logout} currentUserId={currentUserId} />
 
       <div className="page-content">
         <div className="header-section">
           <h2>Films</h2>
-          
-          {/* Tabs */}
           <div className="tabs">
-            <button 
-              className={`tab ${activeTab === 'discover' ? 'active' : ''}`}
-              onClick={() => setActiveTab('discover')}
-            >
+            <button className={`tab ${activeTab === "discover" ? "active" : ""}`} onClick={() => setActiveTab("discover")}>
               Découvrir
             </button>
-            <button 
-              className={`tab ${activeTab === 'my-list' ? 'active' : ''}`}
-              onClick={() => setActiveTab('my-list')}
-            >
+            <button className={`tab ${activeTab === "my-list" ? "active" : ""}`} onClick={() => setActiveTab("my-list")}>
               Ma liste
             </button>
           </div>
         </div>
 
-        {activeTab === 'discover' ? (
+        {activeTab === "discover" ? (
           <>
-            {}
             <div className="search-section">
               <form onSubmit={handleSearch} className="search-bar">
                 <input
                   type="text"
                   placeholder="Rechercher un film..."
-                  value={searchQuery} 
-
+                  value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                 />
                 <button type="submit" disabled={searchLoading}>
                   {searchLoading ? "..." : "Rechercher"}
-
                 </button>
               </form>
-              {!isApiKeyConfigured() && (
-                <p className="api-warning"> Configurez votre clé API TMDB dans src/API/tmdb.ts</p>
-              )}
+              {!isApiKeyConfigured() && <p className="api-warning">Configurez votre clé API TMDB dans src/API/tmdb.ts</p>}
             </div>
 
-            {}
-            <div className="tmdb-movies-grid">
-              {tmdbMovies.map((movie) => (
-                <div key={movie.id} className="tmdb-movie-card">
-                  <div className="movie-poster">
-                    <img 
-                      src={getImageUrl(movie.poster_path)} 
-                      alt={movie.title}
-                      onError={(e) => {
-                        e.currentTarget.src = '/placeholder-movie.png';
-                      }}
-                    />
-                    <div className="movie-overlay">
-                      <div className="movie-rating">🌟 {movie.vote_average.toFixed(1)}</div>
-                      <div className="movie-actions">
-                        <button 
-                          className="btn-add-favorite"
-                          onClick={() => handleAddMovie(movie.title, "favorite")}
-                          title="Ajouter aux favoris"
-                        >
-                          ♥
-                        </button>
-                        <button 
-                          className="btn-add-watchlist"
-                          onClick={() => handleAddMovie(movie.title, "to_watch")}
-                          title="Ajouter à ma liste"
-                        >
-                          +
-                        </button>
-                      
-                        <button
-                          className="btn-add-review"
-                          title="Ajouter une critique"
-                          onClick={() => handleOpenReview(movie.title)}
-                          type="button"
-                        >
-                          🖋
-                        </button>
+            <TmdbMovieGrid
+              movies={tmdbMovies}
+              isLoading={searchLoading}
+              onAddFavorite={(title) => handleAddMovie(title, "favorite")}
+              onAddToWatch={(title) => handleAddMovie(title, "to_watch")}
+              onAddReview={handleOpenReview}
+              getImageUrl={getImageUrl}
+            />
 
-                      </div>
-                    </div>
-     
-                  </div>
-                  <div className="movie-info">
-                    <h4>{movie.title}</h4>
-                    <p className="release-date">{movie.release_date ? new Date(movie.release_date).getFullYear() : 'N/A'}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-          
             <div className="pagination">
-              <button 
-                onClick={handlePreviousPage}
-                disabled={currentPage === 1 || searchLoading}
-                className="btn-pagination"
-              >
+              <button onClick={handlePreviousPage} disabled={currentPage === 1 || searchLoading} className="btn-pagination">
                 ← Précédente
               </button>
-              <span className="page-info">Page {currentPage} sur {totalPages}</span>
-              <button 
-                onClick={handleNextPage}
-                disabled={currentPage >= totalPages || searchLoading}
-                className="btn-pagination"
-              >
+              <span className="page-info">
+                Page {currentPage} sur {totalPages}
+              </span>
+              <button onClick={handleNextPage} disabled={currentPage >= totalPages || searchLoading} className="btn-pagination">
                 Suivante →
               </button>
             </div>
 
-            {tmdbMovies.length === 0 && !searchLoading && (
-              <div className="empty-state">
-                <p>Aucun film trouvé.</p>
-              </div>
-            )}
+            {tmdbMovies.length === 0 && !searchLoading && <div className="empty-state"><p>Aucun film trouvé.</p></div>}
           </>
         ) : (
-          <>
-            {/* Ma liste */}
-            <div className="my-list-section">
-              <div className="list-category">
-                <h3> Favoris</h3>
-                <div className="movies-list">
-                  {favorites.length === 0 ? (
-                    <p className="empty-message">Aucun film favori</p>
-                  ) : (
-                    favorites.map((movie) => (
-                      <div key={movie.id} className="my-movie-card">
-                        <div className="movie-details">
-                          <h4>{movie.title}</h4>
-                          <p className="added-date">
-                            Ajouté le {new Date(movie.added_at).toLocaleDateString('fr-FR')}
-                          </p>
-                        </div>
-                        <button
-                          className="delete-btn"
-                          onClick={() => handleDeleteMovie(movie.id)}
-                          title="Supprimer"
-                        >
-                          ×
-                        </button>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
-
-              <div className="list-category">
-                <h3> À regarder</h3>
-                <div className="movies-list">
-                  {toWatch.length === 0 ? (
-                    <p className="empty-message">Aucun film dans votre watchlist</p>
-                  ) : (
-                    toWatch.map((movie) => (
-                      <div key={movie.id} className="my-movie-card">
-                        <div className="movie-details">
-                          <h4>{movie.title}</h4>
-                          <p className="added-date">
-                            Ajouté le {new Date(movie.added_at).toLocaleDateString('fr-FR')}
-                          </p>
-                        </div>
-                        <button
-                          className="delete-btn"
-                          onClick={() => handleDeleteMovie(movie.id)}
-                          title="Supprimer"
-                        >
-                          ×
-                        </button>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
-            </div>
-          </>
-        )}
-
-        {showReviewModal && (
-          <div className="modal-overlay" onClick={() => setShowReviewModal(false)}>
-            <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-              <h2>Ajouter une critique</h2>
-              <form onSubmit={handleSubmitReview}>
-                <input
-                  type="text"
-                  value={reviewMovieTitle}
-                  readOnly
-                />
-                <label>Note (1-5)</label>
-                <input
-                  type="number"
-                  min="1"
-                  max="5"
-                  value={reviewRating}
-                  onChange={(e) => setReviewRating(e.target.value)}
-                  required
-                />
-                <textarea
-                  placeholder="Votre commentaire..."
-                  value={reviewComment}
-                  onChange={(e) => setReviewComment(e.target.value)}
-                  rows={4}
-                />
-                <div className="modal-buttons">
-                  <button type="button" onClick={() => setShowReviewModal(false)}>
-                    Annuler
-                  </button>
-                  <button type="submit">
-                    Enregistrer
-                  </button>
-                </div>
-              </form>
-            </div>
+          <div className="my-list-section">
+            <MyMovieList title=" Favoris" movies={favorites} onDelete={handleDeleteMovie} />
+            <MyMovieList title=" À regarder" movies={toWatch} onDelete={handleDeleteMovie} />
           </div>
         )}
       </div>
+
+      <ReviewModal
+        isOpen={showReviewModal}
+        movieTitle={reviewMovieTitle}
+        rating={reviewRating}
+        comment={reviewComment}
+        onClose={() => setShowReviewModal(false)}
+        onSubmit={handleSubmitReview}
+        onMovieTitleChange={setReviewMovieTitle}
+        onRatingChange={setReviewRating}
+        onCommentChange={setReviewComment}
+      />
+      <ToastContainer toasts={toasts} onClose={removeToast} />
     </div>
   );
 };

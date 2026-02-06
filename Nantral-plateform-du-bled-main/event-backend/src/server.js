@@ -264,7 +264,6 @@ app.get("/api/events", async (req, res) => {
   }
 });
 
-// Créer un nouvel événement
 app.post("/api/events", async (req, res) => {
   try {
     const { createdBy, movieTitle, location, eventDate, description, maxParticipants } = req.body;
@@ -280,16 +279,22 @@ app.post("/api/events", async (req, res) => {
       [createdBy, movieTitle, location, eventDate, description || null, maxParticipants || null]
     );
 
-    // Ajouter automatiquement le créateur comme participant
-    await pool.query(
-      "INSERT INTO event_participants (event_id, user_id) VALUES ($1, $2)",
-      [result.rows[0].id, createdBy]
-    );
+    try {
+      await pool.query(
+        "INSERT INTO event_participants (event_id, user_id) VALUES ($1, $2) ON CONFLICT (event_id, user_id) DO NOTHING",
+        [result.rows[0].id, createdBy]
+      );
+    } catch (participantErr) {
+      console.warn("Warning adding participant:", participantErr.message);
+      // Continue even if adding participant fails
+    }
 
     res.status(201).json(result.rows[0]);
   } catch (err) {
     console.error("Create event error:", err);
-    res.status(500).json({ error: "Server error creating event" });
+    console.error("Error code:", err.code);
+    console.error("Error message:", err.message);
+    res.status(500).json({ error: "Server error creating event: " + err.message });
   }
 });
 
