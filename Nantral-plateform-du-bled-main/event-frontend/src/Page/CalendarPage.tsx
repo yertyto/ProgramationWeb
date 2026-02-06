@@ -322,6 +322,12 @@ const CalendarPage = () => {
 
   const isCreator = (createdBy: number) => Number(currentUserId) === createdBy;
 
+  const isEventPast = (eventDate: string) => {
+    const now = new Date();
+    const eventDateTime = new Date(eventDate);
+    return eventDateTime < now;
+  };
+
   return (
     <div className="calendar-page">
       <Navbar active="sessions" onLogout={Logout} currentUserId={localStorage.getItem("userId")} />
@@ -347,10 +353,11 @@ const CalendarPage = () => {
           <div className="events-grid">
             {events.map((event) => {
               const showDeleteBtn = isCreator(event.created_by);
+              const isPast = isEventPast(event.event_date);
               console.log(`Event ${event.id}: created_by=${event.created_by}, currentUserId=${currentUserId}, showDeleteBtn=${showDeleteBtn}`);
               
               return (
-                <div key={event.id} className="event-card">
+                <div key={event.id} className={`event-card ${isPast ? 'event-past' : ''}`}>
                   {showDeleteBtn && (
                     <div className="creator-actions">
                       <button
@@ -382,9 +389,16 @@ const CalendarPage = () => {
                   )}
                   <div className="event-header">
                     <h3>{event.movie_title}</h3>
-                    <span className="participant-badge">
-                      {event.participant_count}/{event.max_participants || "∞"}
-                    </span>
+                    <div className="event-badges">
+                      {isPast && (
+                        <span className="status-badge status-past">
+                          Événement passé
+                        </span>
+                      )}
+                      <span className="participant-badge">
+                        {event.participant_count}/{event.max_participants || "∞"}
+                      </span>
+                    </div>
                   </div>
                   <div className="event-details">
                     <div className="detail-row">
@@ -419,7 +433,15 @@ const CalendarPage = () => {
                 </div>
                 {currentUserId && !isCreator(event.created_by) && (
                   <div className="event-actions">
-                    {event.is_participant ? (
+                    {isPast ? (
+                      <button
+                        className="btn-past"
+                        disabled
+                        type="button"
+                      >
+                        Inscription fermée
+                      </button>
+                    ) : event.is_participant ? (
                       <button
                         className="btn-leave"
                         onClick={() => handleLeaveEvent(event.id)}
@@ -432,7 +454,7 @@ const CalendarPage = () => {
                         className="btn-join"
                         onClick={() => handleJoinEvent(event.id)}
                         type="button"
-                        disabled={event.max_participants && event.participant_count >= event.max_participants}
+                        disabled={!!(event.max_participants && event.participant_count >= event.max_participants)}
                       >
                         {event.max_participants && event.participant_count >= event.max_participants ? "Max participants déjà atteint" : "Rejoindre"}
                       </button>
